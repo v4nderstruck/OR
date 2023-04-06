@@ -25,7 +25,7 @@ def solve(instance_path):
     # y - binary decision variable of color is used
     y = {}
     for color in colors:
-        y[color] = model.addVar(name=f"y_{color}", vtype=gp.GRB.BINARY)
+        y[color] = model.addVar(name=f"y_{color}", obj=1, vtype=gp.GRB.BINARY)
     # -------------------------------------------------------------------------
 
     # Update the model to make variables known.
