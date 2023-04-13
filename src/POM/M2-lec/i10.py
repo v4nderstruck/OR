@@ -12,4 +12,6 @@ b = 20
 # import model and solve
 import knapsackmodel
 knapsackmodel.solve(a, p, b)
+import knapsackgraph
+knapsackgraph.solve(a, p, b)
 

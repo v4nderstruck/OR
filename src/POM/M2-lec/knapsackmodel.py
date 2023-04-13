@@ -27,9 +27,13 @@ def solve(a, p, b):
 
     def printSolution():
         if model.status == gp.GRB.OPTIMAL:
+            items = []
             print('\n objective: %g\n' % model.ObjVal)
-            # for i,item in enumerate(x):
-            #     print(' Selected items ', i, ": ", item.x)
+            for i,item in enumerate(x):
+                if item.x > 0:
+                    items.append(i)
+
+            # print('Selected items ', i)
         else:
             print("No solution!")
     printSolution()

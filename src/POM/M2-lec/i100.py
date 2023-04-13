@@ -11,6 +11,9 @@ b = 300
 
 # import model and solve
 import knapsackmodel
+import knapsackgraph
+
 knapsackmodel.solve(a, p, b)
+knapsackgraph.solve(a, p, b)
 
 
