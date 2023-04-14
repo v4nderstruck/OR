@@ -76,7 +76,7 @@ def expand_graph(G: nx.DiGraph, jobs):
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-with open(dir_path + "/data_2.json") as f:
+with open(dir_path + "/data_4.json") as f:
     data = json.load(f)
     # print(json.dumps(data["graph"], indent=2))
     streets_graph = json_graph.node_link_graph(data["graph"])
@@ -85,8 +85,19 @@ with open(dir_path + "/data_2.json") as f:
     G = build_graph(streets_graph, jobs.items())
     expand_graph(G, jobs.items())
 
-    for job_id, job in jobs.items():
-        sg_path = nx.dijkstra_path(
-            G, (job["j_s"], job["j_r"]), ("JOB"+job_id, "EOL"))
-        print("Job {} Start: ({},{}) End: ({},{}) > {}".format(
-            job_id, job["j_s"], job["j_r"], job["j_t"], job["j_d"], sg_path))
+    # for job_id, job in jobs.items():
+    #     sg_path = nx.dijkstra_path(
+    #         G, (job["j_s"], job["j_r"]), ("JOB"+job_id, "EOL"))
+    #     print("Job {} Start: ({},{}) End: ({},{}) > {}".format(
+    #         job_id, job["j_s"], job["j_r"], job["j_t"], job["j_d"], sg_path))
+    
+
+    # all_flows = ["x_({},{})_{}".format(e1, e2, j).replace(" ", "") for e1, e2 in G.edges for j in jobs]
+    # print(all_flows)
+    # print("inEdge", G.in_edges((1,1)))
+    for e1, e2 in G.edges:
+        for n1, n2 in G.edges:
+            if e1[0] == n2[0] and e2[0] == n1[0] and :
+                print("Found a pair (", (e1, e2), "), (", (n1, n2), ")")
+
+

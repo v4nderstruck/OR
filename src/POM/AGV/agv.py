@@ -12,6 +12,7 @@ def find_max_time(jobs):
         max_time = max(max_time, job["j_d"])
     return max_time
 
+
 def expand_graph(G: nx.DiGraph, jobs):
     """Expands the time-expanded graph by destination sinks with 0 weight (see notes)"""
     for job_id, job in jobs:
@@ -47,8 +48,7 @@ def build_graph(g_street, jobs):
     nodes = []
     for i in range(max_time + 1):
         for node in g_street.nodes:
-            nodes.append((node,i))
-
+            nodes.append((node, i))
 
     # adding weighted edges, each neihgbouring node in the street graph is
     # connected directionally to the time layer offsetted by the weight, we keep the
@@ -123,11 +123,54 @@ def solve(full_instance_path):
 
     # Commodity arc variables
     x = {}  # --- TODO ---
+    for e1, e2 in g_time_expanded.edges:
+        for job in jobs:
+            x[e1, e2, job] = model.addVar(
+                obj=1, vtype=gp.GRB.BINARY, name="x_({},{})_{}".format(e1, e2, job).replace(" ", ""))
 
     # Potentially additional variables? --- TODO ---
 
     # --- Constraints
-    # --- TODO ---
+
+    # find a short path for each job
+    for job_id, job in jobs.items():
+        start_node = (job["j_s"], job["j_r"])
+        end_node = ("JOB"+job_id, "EOL")
+        for node in g_time_expanded.nodes:
+            any_in_edges = g_time_expanded.in_edges(node)
+            any_out_edges = g_time_expanded.out_edges(node)
+            # sum to 1
+            if node == start_node:
+                model.addConstr(
+                    gp.quicksum(x[e1, e2, job_id]
+                                for e1, e2 in any_out_edges)  # type: ignore
+                    -
+                    gp.quicksum(x[e1, e2, job_id]
+                                for e1, e2 in any_in_edges) == 1,  # type: ignore
+                )
+
+            # sum to -1
+            elif node == end_node:
+                model.addConstr(
+                    gp.quicksum(x[e1, e2, job_id]
+                                for e1, e2 in any_out_edges)  # type: ignore
+                    -
+                    gp.quicksum(x[e1, e2, job_id]
+                                for e1, e2 in any_in_edges) == -1,  # type: ignore
+
+                )
+            # sum to 0
+            else:
+                model.addConstr(
+                    gp.quicksum(x[e1, e2, job_id]
+                                for e1, e2 in any_out_edges)  # type: ignore
+                    -
+                    gp.quicksum(x[e1, e2, job_id]
+                                for e1, e2 in any_in_edges) == 0,  # type: ignore
+                )
+    # Paths are used only once at a time
+    
+    # nodes can only hold one waiting job
 
     # Solve the model
     model.update()
