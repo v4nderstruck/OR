@@ -126,3 +126,65 @@ course immediately.
 - Make sure to upload one file named agv.py.
 - Using the bitshift or implication operator is not allowed.
 
+## Model
+
+**Input data**
+- We have containers `j` at a arrival and destination location with timestamps.
+  - given in the data.json as object `data["jobs"]`: 
+    ```ts
+     container_id : {
+      "j_s": number, // arrival node 
+      "j_t": number, // destination node 
+      "j_r": number, // arrival time
+      "j_d": number, // deadline
+     }
+    ```
+- A Graph with `Node: location` and `Edges: streets between locations`
+ - given in data.json as object `data["graph"]`, can be parsed directly into a
+   weighted graph using nx
+
+
+### Solution
+
+**Graph-Model**
+
+Use a time expanded graph with one plane for each timestep built using given data
+- total: 0...kmax planes (timesteps)
+- Node: `(location, timestep)`
+  - note: for each container add a sink node with edges from `(destination,
+    *)` with `*` for each time step. We can use this for the route finding.
+- Edges: undirected `(node, node, weight)`
+  - Edges for moving container: `((location, k), (next, k+w), w)`
+  - Edges for waiting: `((location,k), (location,k+1), 1)` 
+
+**MIP Model**
+
+> ~~we may use G.neighbors() and filter by time to find in-coming / out-going edges~~
+> We can convert the nx.Graph to an nx.DiGraph during graph building. This
+> allows us to get in/out-edges simplier
+
+Variables: X
+- X: `X[v1,v2,j]: boolean`
+  - Move container j from node to node (in graph model)
+  - note: each container, can move from time `j_r` to `j_d`
+  - use name in format `x_((0,1),(1,3))_4`
+
+Constraint
+- Constraint: paths (undirected) only used by one container at a time
+  - `sum(X[(location, k),(next, k+w),j]) + sum(X[(next, k), (location, k+w), j]) <= 1` 
+  - note: essentially walk over all edges for each container
+- Constraint: at a location, there can only be one container at a time
+  - `sum(X[(prev, k), (location, k+w), j]) <= 1`
+  - note: walk over all all in-edges for each container, except for when
+    location is the destination
+- Constraint: find a path from start to finish
+  - `sum(in-edges) + sum(out-edges) = {1,-1,0}`
+  - for `(start, finish, intermediate)` nodes 
+  - note: we introduce a finish node for each container `(-1337, -1337)` (with
+    edge weight 0) which all `(destination, *)` will lead to. This node will be
+    used as target.
+
+Optimizer: Minimize total time steps for all containers
+  - `sum(X[v1,v2,*] * timediff)` over all containers
+  - timediff: weight of edge (v1,v2)
+  - since the last timestep will have an edge of weight 0, this should be fine!

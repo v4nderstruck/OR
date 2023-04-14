@@ -4,30 +4,84 @@ import json
 import networkx as nx
 from networkx.readwrite import json_graph
 
+
+def find_max_time(jobs):
+    """Find the maximum time in the jobs"""
+    max_time = 0
+    for _job_id, job in jobs:
+        max_time = max(max_time, job["j_d"])
+    return max_time
+
+def expand_graph(G: nx.DiGraph, jobs):
+    """Expands the time-expanded graph by destination sinks with 0 weight (see notes)"""
+    for job_id, job in jobs:
+        time_start = job["j_r"]
+        time_end = job["j_d"]
+        destination = job["j_t"]
+        G.add_node(("JOB"+job_id, "EOL"))
+
+        for time in range(time_start, time_end + 1):
+            G.add_edge((destination, time), ("JOB"+job_id, "EOL"), weight=0)
+
 # --- TODO ---
 # This function is missing not only its content but also proper documentation! We recommend you to finish the docstring
 # As a sidenote, in most code editors you can add function comment strings like below automatically with a key combination. For VSC, the extension autoDocstring is necessary.
+
+
 def build_graph(g_street, jobs):
     """Constructs the time-expanded graph
 
     Args:
-        g_street (which datatype?): What is this?
-        jobs (which datatype?): Good documentation is important!
+        g_street (nx.Graph): Graph describing the street network
+        jobs (dict_items): list of jobs (job_id, {j_s, j_t, j_r, j_d})
 
     Returns:
-        (some datatype(s)): what do you want to return?
+        time expanded graph (nx.DiGraph)
     """
 
     # New directed graph
     g_time_expanded = nx.DiGraph()
+    max_time = find_max_time(jobs)
 
-    # Adding nodes --- TODO ---
+    # building time expanded graph for each time plane, create nodes
+    nodes = []
+    for i in range(max_time + 1):
+        for node in g_street.nodes:
+            nodes.append((node,i))
 
-    # Adding arcs --- TODO ---
+
+    # adding weighted edges, each neihgbouring node in the street graph is
+    # connected directionally to the time layer offsetted by the weight, we keep the
+    # weight for calculations later.
+    edges = []
+
+    # first edges where we may move the container!
+    for node in g_street.nodes:
+        for neighbor in g_street.neighbors(node):
+            for time in range(max_time + 1):
+                if time + g_street[node][neighbor]["weight"] <= max_time:
+                    edges.append(
+                        (
+                            (node, time),
+                            (neighbor, time +
+                             g_street[node][neighbor]["weight"]),
+                            g_street[node][neighbor]["weight"]
+                        )
+                    )
+    # then the waiting edges
+    for node in g_street.nodes:
+        for time in range(max_time):
+            edges.append(((node, time), (node, time + 1), 1))
+
+    # finally, build the graph
+    g_time_expanded.add_nodes_from(nodes)
+    g_time_expanded.add_weighted_edges_from(edges)
 
     return g_time_expanded
 
 # You do not need to change anything in this function
+
+
 def read_instance(full_instance_path):
     """Reads JSON file
 
@@ -56,10 +110,11 @@ def solve(full_instance_path):
     """
 
     # Read in the instance data
-    jobs, g_street= read_instance(full_instance_path)
+    jobs, g_street = read_instance(full_instance_path)
 
     # Construct graph --- NOTE: Please use networkx for this task, it is necessary for the plots in the Jupyter file.
-    g_time_expanded = build_graph(g_street, jobs)
+    g_time_expanded = build_graph(g_street, jobs.items())
+    expand_graph(g_time_expanded, jobs.items())
 
     # === Gurobi model ===
     model = gp.Model("AGV")
@@ -81,4 +136,4 @@ def solve(full_instance_path):
     # model.computeIIS()
     # model.write("model.ilp")
 
-    return model, g_time_expanded 
+    return model, g_time_expanded
