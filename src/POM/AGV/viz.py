@@ -76,12 +76,11 @@ def expand_graph(G: nx.DiGraph, jobs):
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-with open(dir_path + "/data_4.json") as f:
+with open(dir_path + "/data_2.json") as f:
     data = json.load(f)
     # print(json.dumps(data["graph"], indent=2))
     streets_graph = json_graph.node_link_graph(data["graph"])
     jobs = data["jobs"]
-    print(json.dumps(jobs, indent=2))
     G = build_graph(streets_graph, jobs.items())
     expand_graph(G, jobs.items())
 
@@ -90,14 +89,32 @@ with open(dir_path + "/data_4.json") as f:
     #         G, (job["j_s"], job["j_r"]), ("JOB"+job_id, "EOL"))
     #     print("Job {} Start: ({},{}) End: ({},{}) > {}".format(
     #         job_id, job["j_s"], job["j_r"], job["j_t"], job["j_d"], sg_path))
-    
 
     # all_flows = ["x_({},{})_{}".format(e1, e2, j).replace(" ", "") for e1, e2 in G.edges for j in jobs]
     # print(all_flows)
     # print("inEdge", G.in_edges((1,1)))
-    for e1, e2 in G.edges:
-        for n1, n2 in G.edges:
-            if e1[0] == n2[0] and e2[0] == n1[0] and :
-                print("Found a pair (", (e1, e2), "), (", (n1, n2), ")")
 
+    # print(json.dumps(jobs, indent=2))
 
+    print("Nodes: {}".format(G.nodes))
+    # get all cross
+    for node in G.nodes:
+        # ignore artificial nodes
+        if isinstance(node[0], str) and "JOB" in node[0]:
+            continue
+
+        in_coming = G.in_edges(node)
+        # print("checking In edges for {}: {}".format(node, in_coming))
+        for source, into in in_coming:  # type: ignore
+            # ignore waiting edges
+            if source[1] == into[1] - 1 and source[0] == into[0]:
+                continue
+
+            crossed_edges = [(e1, e2) for e1, e2 in G.edges
+                             if e1[0] == into[0] and e2[0] == source[0] and
+                             e1[1] in range(into[1] - G[source][into]["weight"], into[1])]
+            for job_id, job in jobs.items():
+                
+
+    print("Max time: {}".format(find_max_time(jobs.items())))
+    print(len(jobs.items()))

@@ -19,8 +19,7 @@ def expand_graph(G: nx.DiGraph, jobs):
         time_start = job["j_r"]
         time_end = job["j_d"]
         destination = job["j_t"]
-        G.add_node(("JOB"+job_id, "EOL"),
-                   pos=(len(G.nodes) + 1, find_max_time(jobs)))
+        G.add_node(("JOB"+job_id, "EOL"))
 
         for time in range(time_start, time_end + 1):
             G.add_edge((destination, time), ("JOB"+job_id, "EOL"), weight=0)
@@ -49,7 +48,7 @@ def build_graph(g_street, jobs):
     nodes = []
     for i in range(max_time + 1):
         for node in g_street.nodes:
-            nodes.append(((node, i), {"pos": (node, i)}))
+            nodes.append((node, i))
 
     # adding weighted edges, each neihgbouring node in the street graph is
     # connected directionally to the time layer offsetted by the weight, we keep the
@@ -140,7 +139,7 @@ def solve(full_instance_path):
         for node in g_time_expanded.nodes:
             any_in_edges = g_time_expanded.in_edges(node)
             any_out_edges = g_time_expanded.out_edges(node)
-            # sum to 1, startnode
+            # sum to 1
             if node == start_node:
                 model.addConstr(
                     gp.quicksum(x[e1, e2, job_id]
@@ -150,7 +149,7 @@ def solve(full_instance_path):
                                 for e1, e2 in any_in_edges) == 1,  # type: ignore
                 )
 
-            # sum to -1, target node
+            # sum to -1
             elif node == end_node:
                 model.addConstr(
                     gp.quicksum(x[e1, e2, job_id]
@@ -170,69 +169,21 @@ def solve(full_instance_path):
                                 for e1, e2 in any_in_edges) == 0,  # type: ignore
                 )
     # Paths are used only once at a time
-    for node in g_time_expanded.nodes:
-        # ignore artificial nodes
-        if isinstance(node[0], str) and "JOB" in node[0]:
-            continue
-
-        in_coming = g_time_expanded.in_edges(node)
-        # print("checking In edges for {}: {}".format(node, in_coming))
-        for source, into in in_coming:  # type: ignore
-            # ignore waiting edges
-            if source[1] == into[1] - 1 and source[0] == into[0]:
-                continue
-
-            # crossed_edges = [(e1, e2) for e1, e2 in g_time_expanded.edges
-            #                  if e1[0] == into[0] and e2[0] == source[0] and
-            #                  e1[1] in range(into[1] - g_time_expanded[source][into]["weight"], into[1])]
-
-            crossed_edges = [(e1, e2) for e1, e2 in g_time_expanded.edges
-                             if e1[0] == into[0] and e2[0] == source[0] and
-                             e1[1] == into[1] - g_time_expanded[source][into]["weight"]]
-            for a_job in jobs:
-                model.addConstr(
-                    gp.quicksum(x[e1, e2, job]
-                                for e1, e2 in crossed_edges
-                                for job in jobs if job != a_job)  # type: ignore  <= 1
-                    +
-                    x[source, into, a_job]
-                    <= 1
-                )
-            # model.addConstr(
-            #     gp.quicksum(x[e1, e2, job]
-            #                 for e1, e2 in crossed_edges
-            #                 for job in jobs )  # type: ignore  <= 1
-            #     <= 1
-            # )
 
     # nodes can only hold one waiting job
     # this means that sum over all incoming edges must be at max 1 except for
     # final destination of a job
-    # for node in g_time_expanded.nodes:
-    #     # the sink nodes are artificial and are not part of the solution
-    #     if isinstance(node[0], str) and "JOB" in node[0]:
-    #         continue
-
-    #     model.addConstr(
-    #         gp.quicksum(x[e1, e2, job_id] for e1, e2 in g_time_expanded.in_edges(node)  # type: ignore
-    #                     for job_id, job in jobs.items() if e2[0] != job["j_t"]
-    #                     ) <= 1
-    #     )
-
-    # only one job can be in a node waiting at a time
-    for e1, e2 in g_time_expanded.edges:
-        # ignore artificial nodes
-        if isinstance(e2[0], str) and "JOB" in e2[0]:
+    for node in g_time_expanded.nodes:
+        # the sink nodes are artificial and are not part of the solution
+        if "JOB" in node[0]: 
             continue
-        if e1[1] == e2[1] - 1 and e1[0] == e2[0]:
-            model.addConstr(
-                gp.quicksum(x[e1, e2, job_id] for job_id in jobs) <= 1
-            )
 
-    model.setObjective(
-        gp.quicksum(x[e1, e2, job] * g_time_expanded[e1][e2]["weight"]
-                    for e1, e2 in g_time_expanded.edges for job in jobs), gp.GRB.MINIMIZE
-    )
+        model.addConstr(
+            gp.quicksum(x[e1, e2, job_id]
+                        for e1, e2 in g_time_expanded.in_edges(node) # type: ignore
+                        for job_id, job in jobs.items() if e2[0] != job["j_d"]
+                        ) <= 1
+        )
     # Solve the model
     model.update()
     model.optimize()
@@ -240,32 +191,4 @@ def solve(full_instance_path):
     # model.computeIIS()
     # model.write("model.ilp")
 
-    def printSolution():
-        if model.status == gp.GRB.OPTIMAL:
-            for job_id, job in jobs.items():
-                for e1, e2 in g_time_expanded.edges:
-                    if x[e1, e2, job_id].x > 0.9:
-                        print("Move job [{}]({},{}) > ({},{}) from {} to {}".format(
-                            job_id, job["j_s"], job["j_r"], job["j_t"], job["j_d"], e1, e2))
-
-            print('\n objective: %g\n' % model.ObjVal)
-        else:
-            print("No solution!")
-    printSolution()
-
     return model, g_time_expanded
-
-# - The optimal objective value is 5 for data_1.json, 152 for data_2.json and 783
-#   for data_3.json.
-
-
-def helper():
-    import os
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    full_instance_path = dir_path+'/data_3.json'
-    with open(full_instance_path) as f:
-        data = json.load(f)
-        g_street = json_graph.node_link_graph(data['graph'])
-        solve(full_instance_path)
-        jobs = data['jobs']
-        # print(json.dumps(jobs, indent=2))
