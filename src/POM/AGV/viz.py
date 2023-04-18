@@ -110,11 +110,12 @@ with open(dir_path + "/data_2.json") as f:
             if source[1] == into[1] - 1 and source[0] == into[0]:
                 continue
 
-            crossed_edges = [(e1, e2) for e1, e2 in G.edges
-                             if e1[0] == into[0] and e2[0] == source[0] and
-                             e1[1] in range(into[1] - G[source][into]["weight"], into[1])]
-            for job_id, job in jobs.items():
-                
-
+            # crossed_edges = [(e1, e2) for e1, e2 in G.edges 
+            #                  if e1[0] == into[0] and e2[0] == source[0] 
+            #                  and e1[1] in range(into[1] - G[source][into]["weight"], into[1])]
+            crossed_edges = [(e1, e2) for e1, e2 in G.edges 
+                             if e1[0] == into[0] and e2[0] == source[0] 
+                             and e1[1] == into[1] - G[source][into]["weight"]]
+            print("Crossed edges for {} -> {} : {}".format(source, into, crossed_edges))
     print("Max time: {}".format(find_max_time(jobs.items())))
     print(len(jobs.items()))

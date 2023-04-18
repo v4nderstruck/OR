@@ -8,7 +8,7 @@ from networkx.readwrite import json_graph
 def find_max_time(jobs):
     """Find the maximum time in the jobs"""
     max_time = 0
-    for _job_id, job in jobs:
+    for job_id, job in jobs:
         max_time = max(max_time, job["j_d"])
     return max_time
 
@@ -182,28 +182,42 @@ def solve(full_instance_path):
             if source[1] == into[1] - 1 and source[0] == into[0]:
                 continue
 
-            # crossed_edges = [(e1, e2) for e1, e2 in g_time_expanded.edges
-            #                  if e1[0] == into[0] and e2[0] == source[0] and
-            #                  e1[1] in range(into[1] - g_time_expanded[source][into]["weight"], into[1])]
-
             crossed_edges = [(e1, e2) for e1, e2 in g_time_expanded.edges
                              if e1[0] == into[0] and e2[0] == source[0] and
-                             e1[1] == into[1] - g_time_expanded[source][into]["weight"]]
-            for a_job in jobs:
-                model.addConstr(
-                    gp.quicksum(x[e1, e2, job]
-                                for e1, e2 in crossed_edges
-                                for job in jobs if job != a_job)  # type: ignore  <= 1
-                    +
-                    x[source, into, a_job]
-                    <= 1
-                )
-            # model.addConstr(
-            #     gp.quicksum(x[e1, e2, job]
-            #                 for e1, e2 in crossed_edges
-            #                 for job in jobs )  # type: ignore  <= 1
-            #     <= 1
-            # )
+                             e1[1] in range(into[1] - g_time_expanded[source][into]["weight"], into[1])]
+
+            # crossed_edges = [(e1, e2) for e1, e2 in g_time_expanded.edges
+            #                  if e1[0] == into[0] and e2[0] == source[0] and
+            #                  e1[1] == into[1] - g_time_expanded[source][into]["weight"]]
+
+            # for a_job in jobs:
+            #     model.addConstr(
+            #         gp.quicksum(x[e1, e2, job]
+            #                     for e1, e2 in crossed_edges
+            #                     for job in jobs if job != a_job)  # type: ignore  <= 1
+            #         +
+            #         x[source, into, a_job]
+            #         <= 1
+            #     )
+            model.addConstr(
+                gp.quicksum(x[e1, e2, job]
+                            for e1, e2 in crossed_edges
+                            for job in jobs )  # type: ignore  <= 1
+                +
+                gp.quicksum(x[source, into, job]
+                            for job in jobs )  # type: ignore  <= 1
+                <= 1
+            )
+
+    # path are not uesed by more than one job in the same direction
+    for e1, e2 in g_time_expanded.edges:
+        # ignore artificial nodes
+        if isinstance(e2[0], str) and "JOB" in e2[0]:
+            continue
+        
+        model.addConstr(
+            gp.quicksum(x[e1, e2, job_id] for job_id in jobs) <= 1
+        )
 
     # nodes can only hold one waiting job
     # this means that sum over all incoming edges must be at max 1 except for
@@ -228,6 +242,7 @@ def solve(full_instance_path):
             model.addConstr(
                 gp.quicksum(x[e1, e2, job_id] for job_id in jobs) <= 1
             )
+
 
     model.setObjective(
         gp.quicksum(x[e1, e2, job] * g_time_expanded[e1][e2]["weight"]
@@ -259,13 +274,13 @@ def solve(full_instance_path):
 #   for data_3.json.
 
 
-def helper():
-    import os
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    full_instance_path = dir_path+'/data_3.json'
-    with open(full_instance_path) as f:
-        data = json.load(f)
-        g_street = json_graph.node_link_graph(data['graph'])
-        solve(full_instance_path)
-        jobs = data['jobs']
-        # print(json.dumps(jobs, indent=2))
+# def helper():
+#     import os
+#     dir_path = os.path.dirname(os.path.realpath(__file__))
+#     full_instance_path = dir_path+'/data_1.json'
+#     with open(full_instance_path) as f:
+#         data = json.load(f)
+#         g_street = json_graph.node_link_graph(data['graph'])
+#         solve(full_instance_path)
+#         jobs = data['jobs']
+#         # print(json.dumps(jobs, indent=2))

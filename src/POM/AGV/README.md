@@ -118,7 +118,7 @@ course immediately.
 
 - Please ensure that your model is linear. If you multiply different variables,
   this will result in 0 points.
-- The optimal objective value is 5 for data_1.json, 152 for data_2.json and 783
+-  he optimal objective value is 5 for data_1.json, 172 for data_2.json and 850 
   for data_3.json.
 - You can add additional variables, but the specified variables have to be in
   your model. Otherwise, you will receive 0 points.
