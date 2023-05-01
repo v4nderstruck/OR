@@ -257,11 +257,13 @@ def solve(full_instance_path):
 
     def printSolution():
         if model.status == gp.GRB.OPTIMAL:
-            for job_id, job in jobs.items():
-                for e1, e2 in g_time_expanded.edges:
-                    if x[e1, e2, job_id].x > 0.9:
-                        print("Move job [{}]({},{}) > ({},{}) from {} to {}".format(
-                            job_id, job["j_s"], job["j_r"], job["j_t"], job["j_d"], e1, e2))
+            # for v in model.getVars():
+            #     print(v.VarName, v.X)
+            # for job_id, job in jobs.items():
+            #     for e1, e2 in g_time_expanded.edges:
+            #         if x[e1, e2, job_id].x > 0.9:
+            #             print("Move job [{}]({},{}) > ({},{}) from {} to {}".format(
+            #                 job_id, job["j_s"], job["j_r"], job["j_t"], job["j_d"], e1, e2))
 
             print('\n objective: %g\n' % model.ObjVal)
         else:
@@ -274,13 +276,3 @@ def solve(full_instance_path):
 #   for data_3.json.
 
 
-# def helper():
-#     import os
-#     dir_path = os.path.dirname(os.path.realpath(__file__))
-#     full_instance_path = dir_path+'/data_1.json'
-#     with open(full_instance_path) as f:
-#         data = json.load(f)
-#         g_street = json_graph.node_link_graph(data['graph'])
-#         solve(full_instance_path)
-#         jobs = data['jobs']
-#         # print(json.dumps(jobs, indent=2))
