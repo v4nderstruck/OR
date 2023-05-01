@@ -27,13 +27,26 @@ def solve(p, c, alpha, customers, distances, demands):
     model = Model("Hub Location")
 
     ## test c and alpha
-    c = 1
+    c = 1.0
     alpha = 0.5
 
     # You can try and disable cutting planes - what happens?
     # model.setParam(GRB.Param.Cuts, 0)
     # NOTE: Please do not turn off cutting planes in your final submission
 
+    supply = {}
+    for i in customers:
+        sum_i = 0
+        for j in customers:
+            sum_i += demands[i][j]
+        supply[i] = sum_i
+
+    demand = {}
+    for i in customers:
+        sum_i = 0
+        for j in customers:
+            sum_i += demands[j][i]
+        demand[i] = sum_i
 
     # assignment[i, k] = 1 if customer i is assigned to hub k
     # assuming: customers list also represents locations
@@ -71,24 +84,29 @@ def solve(p, c, alpha, customers, distances, demands):
     # Constraint 4: flow conservation
     for k in customers:
         for i in customers:
+            # sum all demands origiting from i using demands
             model.addConstr(
                     quicksum(y[i, k, l] for l in customers) 
                     +
-                    quicksum(demands[i][j] * assignment[i,k] for j in customers)
+                    quicksum(demands[i][j] * assignment[j,k] for j in customers)
                     ==
                     quicksum(y[i, l, k] for l in customers)
                     +
-                    quicksum(demands[i][j] * assignment[j,k] for j in customers)
+                    supply[i] * assignment[i,k] 
                     )
 
 
     # --- Solve model ---   
     model.modelSense = GRB.MINIMIZE
 
+
+
     model.setObjective(
-            quicksum(alpha * c * distances[k][l] * y[i,k,l] for i in customers for k in customers for l in customers)
+            quicksum(alpha * c * distances[k][l] * y[i,k,l] 
+                     for i in customers for k in customers for l in customers)
             + 
-            quicksum(c * distances[i][k] * assignment[i,k] for i in customers for k in customers)
+            quicksum(distances[i][k] * assignment[i,k] * (c * supply[i] + c * demand[i]) 
+                     for i in customers for k in customers)
             )
 
     # If you want to solve just the LP relaxation, uncomment the lines below
@@ -104,10 +122,13 @@ def solve(p, c, alpha, customers, distances, demands):
 
     def printSolution():
         if model.status == GRB.OPTIMAL:
-            print('\n objective: %g\n' % model.ObjVal)
-            for flows in y:
-                if y[flows].x > 0:
-                    print(f"{y[flows].varName} {y[flows].x}")
+            print('\n objective: %0.3f\n' % model.ObjVal)
+            # for flows in y:
+            #     if y[flows].x > 0:
+            #         print(f"{y[flows].varName} {y[flows].x}")
+            # for a in assignment:
+            #     if assignment[a].x > 0:
+            #         print(f"{assignment[a].varName} {assignment[a].x}")
         else:
             print("No solution!")
     printSolution()
@@ -115,10 +136,19 @@ def solve(p, c, alpha, customers, distances, demands):
     return model
 
 
+# optimal values:  c = 1.0, alpha = 0.5 
+# n10: 63661768.81
+# n20: 59358110.06
+# n30: 61902278.16
+# n40: 63294732.74
+# n50: 63412465.95
+# n60: 53915049.74
+# n70: 54459098.68
+
 if __name__ == "__main__":
     import os
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    full_instance_path = dir_path+'/n10.json'
+    full_instance_path = dir_path+'/n70.json'
     # p, c, alpha, customers, distances, demands = read_instance("n10.json")
     p, c, alpha, customers, distances, demands = read_instance(full_instance_path)
 

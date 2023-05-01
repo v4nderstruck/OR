@@ -29,11 +29,8 @@ for i in range(len(distances)):
             g.add_edge(i, j, weight=d)
 
 
-for node_a in g.nodes:
-    for node_b in g.nodes:
-        if node_a == node_b:
-            continue
-        # print(node_a, node_b, g[node_a][node_b], ["weight"])
+for demand in demands:
+    print("demand", demand)
 
 
 # pos = nx.nx_agraph.graphviz_layout(g, "neato")
