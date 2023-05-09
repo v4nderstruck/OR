@@ -48,38 +48,26 @@ def solve(p, c, alpha, customers, distances, demands):
             sum_i += demands[j][i]
         demand[i] = sum_i
 
-    # assignment[i, k] = 1 if customer i is assigned to hub k
-    # assuming: customers list also represents locations
-    # forum discussion: https://moodle.rwth-aachen.de/mod/forum/discuss.php?d=196169
     assignment = {}
     for i in customers:
         for k in customers:
             assignment[i, k] = model.addVar(
                 vtype="b", obj=1, name=f"assignment_{i}_{k}")
 
-    # three index formulation: flow from started at i through hub k and hub l
-    y = {}
+    # 4 index formulation: flow from started at i through hub k and hub l to j
+    x = {}
     for i in customers:
-        for k in customers:
-            for l in customers:
-                y[i, k, l] = model.addVar(
-                    vtype="c", lb=0, name=f"y_{i}_{k}_{l}", obj=1.0)
+        for j in customers:
+            for k in customers:
+                for l in customers:
+                    x[i, j, k, l] = model.addVar(
+                        vtype="b", name=f"x_{i}_{j}_{k}_{l}", obj=1.0)
 
     model.update()
-    # model._y_vars = {}
-    # for i in customers:
-    #     for k in customers:
-    #         for l in customers:
-    #             model._y_vars[i, k, l] = model.getVarByName(f"y_{i}_{k}_{l}")
-
-    # model._a_vars = {}
-    # for i in customers:
-    #     for k in customers:
-    #         model._a_vars[i, k] = model.getVarByName(f"assignment_{i}_{k}")
 
     # --- Constraints ---
-
-    # Constraint 1: dont create more than p hubs
+    
+    # Constraint 1: maxmimal p hubs
     model.addConstr(quicksum(assignment[i, i] for i in customers) <= p)
 
     # Constraint 2: each customer is assigned to exactly one hub
@@ -91,77 +79,48 @@ def solve(p, c, alpha, customers, distances, demands):
         for k in customers:
             model.addConstr(assignment[i, k] <= assignment[k, k])
 
-    # model.addConstr(
-    #         quicksum(y[i, k, l] for i in customers for k in customers for l in customers) 
-    #         ==
-    #         quicksum(supply[i] for i in customers)
-    #         )
-    # Constraint 4: flow conservation
-    for k in customers:
-        for i in customers:
-            # sum all demands origiting from i using demands
-            model.addConstr(
-                quicksum(y[i, k, l] for l in customers)
-                +
-                quicksum(demands[i][j] * assignment[j, k] for j in customers)
-                ==
-                quicksum(y[i, l, k] for l in customers)
-                +
-                supply[i] * assignment[i, k]
-            )
+    # Constraint 4: x[i, *, k, l] if assignment[i, k] == 1 
+    for i in customers:
+        for j in customers:
+            for k in customers:
+                model.addConstr(quicksum(x[i, j, k, l] for l in customers) == assignment[i, k])
+
+    # Constraint 5: x[*, j, k, l] if assignment[j, l] == 1
+    for i in customers:
+        for j in customers:
+            for l in customers:
+                model.addConstr(quicksum(x[i, j, k, l] for k in customers) == assignment[j,l])
+
+    
+
+
 
     # --- Solve model ---
     model.modelSense = GRB.MINIMIZE
+
     model.setObjective(
-        quicksum(alpha * c * distances[k][l] * y[i, k, l]
-                 for i in customers for k in customers for l in customers)
-        +
         quicksum(distances[i][k] * assignment[i, k] * (c * supply[i] + c * demand[i])
                  for i in customers for k in customers)
+        + 
+        quicksum(alpha * c * demands[i][j] * distances[k][l] * x[i, j, k, l] 
+                 for i in customers for k in customers for l in customers for j in customers)
     )
-
     # If you want to solve just the LP relaxation, uncomment the lines below
     # model.update()
     # model = model.relax()
-    model.update()
+    # model.update()
     # model = model.relax()
 
-
     model.update()
+    # model.setParam(GRB.Param.Presolve, 0)
     # model.setParam(GRB.Param.Heuristics, 0.1)
     # model.setParam(GRB.Param.Cuts, 0)
     # model.setParam(GRB.Param.MIRCuts, 0)
     # model.setParam(GRB.Param.MIPFocus, 3)
-    
-    # def cb(model, where):
-    #     if where == GRB.Callback.MIPSOL:
-    #         # index and values from list model._y_vars that are bigger than zero
-    #         solutions = model.cbGetSolution(model._y_vars)
-    #         assignments = model.cbGetSolution(model._a_vars)
-    #         # demanded_index = {k: v for k, v in solutions.items() if v > 0.01}
-    #         assigned_index = [k for (i,k), v in assignments.items() if v > 0.0]
-    #         assigned_index = list(set(assigned_index))
-    #         print(assigned_index)
 
-
-            # print(demanded_index)
-            # for (i, k, l), v in demanded_index.items():
-            #     model.cbLazy(
-            #         quicksum(model._y_vars[i, k, m] for m in customers)
-            #         +
-            #         quicksum(demands[i][j] * model._a_vars[j, k]
-            #                  for j in customers)
-            #         ==
-            #         quicksum(model._y_vars[i, m, k] for m in customers)
-            #         +
-            #         supply[i] * model._a_vars[i, k]
-            #     )
-
-            # demanded = tuplelist((i, k, l) for i in customers for k in customers for l in customers if y[i, k, l].x > 0.5)
-            # print(demanded)
     # model.params.LazyConstraints = 1
-    # model.optimize(cb)
     model.optimize()
+    # model.optimize()
     # model.write("model.lp")
 
     # If your model is infeasible (but you expect it to not be), comment out the lines below to compute and write out a infeasible subsystem (Might take very long)
@@ -173,12 +132,9 @@ def solve(p, c, alpha, customers, distances, demands):
             print('\n objective: %0.3f\n' % model.ObjVal)
 
             # print(model.getVars())
-            # for flows in y:
-            #     if y[flows].x > 0:
-            #         print(f"{y[flows].varName} {y[flows].x}")
-            # for a in assignment:
-            #     if assignment[a].x > 0:
-            #         print(f"{assignment[a].varName} {assignment[a].x}")
+            # for flows in x:
+            #     if x[flows].x > 0:
+            #         print(f"{x[flows].varName} {x[flows].x}")
         else:
             print("No solution!")
     printSolution()
@@ -199,8 +155,8 @@ if __name__ == "__main__":
     pass
     # import os
     # dir_path = os.path.dirname(os.path.realpath(__file__))
-    # full_instance_path = dir_path+'/n40.json'
-    # p, c, alpha, customers, distances, demands = read_instance("n10.json")
+    # full_instance_path = dir_path+'/n10.json'
+    # # p, c, alpha, customers, distances, demands = read_instance("n10.json")
     # p, c, alpha, customers, distances, demands = read_instance(
     #     full_instance_path)
 
