@@ -50,6 +50,8 @@ def solve(p, c, alpha, customers, distances, demands):
         all_demand += sum_i
         demand[i] = sum_i
 
+
+    all_demand = 5 * all_demand
     # assignment[i, k] = 1 if customer i is assigned to hub k
     # assuming: customers list also represents locations
     # forum discussion: https://moodle.rwth-aachen.de/mod/forum/discuss.php?d=196169
@@ -68,17 +70,6 @@ def solve(p, c, alpha, customers, distances, demands):
                     vtype="c", lb=0, name=f"y_{i}_{k}_{l}", obj=1.0)
 
     model.update()
-    # model._y_vars = {}
-    # for i in customers:
-    #     for k in customers:
-    #         for l in customers:
-    #             model._y_vars[i, k, l] = model.getVarByName(f"y_{i}_{k}_{l}")
-
-    # model._a_vars = {}
-    # for i in customers:
-    #     for k in customers:
-    #         model._a_vars[i, k] = model.getVarByName(f"assignment_{i}_{k}")
-
     # --- Constraints ---
 
     # Constraint 1: dont create more than p hubs
@@ -95,11 +86,16 @@ def solve(p, c, alpha, customers, distances, demands):
 
     # Constraint 4: Supply must flow through open hubs
     for i in customers:
+        model.addConstr(y[i, i, i] == supply[i] * assignment[i, i])
         for k in customers:
-            # BigM constraint to get rid of floating errors?
-            model.addConstr(quicksum(y[i, m, k] for m in customers) <= assignment[k, k] * all_demand)
-            model.addConstr(
-                y[i, k, k] >= assignment[k, k] * supply[i])
+            # big M constraint - makes sure that y[i, k, l] is only > 0 if k is a true hub
+            model.addConstr(quicksum(y[i, k, l] for l in customers) <= assignment[k, k] * all_demand)
+            # big M constraint - makes sure that y[i, k, l] is only > 0 if l is a true hub
+            model.addConstr(quicksum(y[i, l, k] for l in customers) <= assignment[k, k] * all_demand)
+            # a flow can only go through an open hub
+            for l in customers:
+                model.addConstr(y[i, k, l] <= assignment[k, k] * supply[i])
+                model.addConstr(y[i, k, l] <= assignment[l, l] * supply[i])
 
     # Constraint 4: flow conservation
     for k in customers:
@@ -155,15 +151,15 @@ def solve(p, c, alpha, customers, distances, demands):
                             y[flows].varName, assignment[k, k].x, assignment[l, l].x, y[flows].x, assignment[i, k].x))
 
                         print(
-                            "     due >= {} * {}".format(assignment[k, k].x, supply[i]))
+                            "     due >= {} * {}".format(assignment[i, k].x, supply[i]))
                     # else:
                     #     print("{} (k:{},l:{}) {} valid".format(
                     #         y[flows].varName, assignment[k, k].x, assignment[l, l].x, y[flows].x))
 
-            # for i, k in assignment:
-            #     if i == k and assignment[i, k].x > 0:
-            #         print(
-            #             f"hubs {assignment[i,k].varName} {assignment[i,k].x}")
+            for i, k in assignment:
+                if i == k and assignment[i, k].x > 0:
+                    print(
+                        f"hubs {assignment[i,k].varName} {assignment[i,k].x}")
                 # elif assignment[i, k].x > 0:
                 #     print(
                 #         f"assignment {assignment[i,k].varName} {assignment[i,k].x}")
