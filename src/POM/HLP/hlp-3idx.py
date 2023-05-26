@@ -27,8 +27,8 @@ def solve(p, c, alpha, customers, distances, demands):
     model = Model("Hub Location")
 
     # test c and alpha
-    c = 1.0
-    alpha = 0.5
+    # c = 1.0
+    # alpha = 0.5
 
     # You can try and disable cutting planes - what happens?
     # model.setParam(GRB.Param.Cuts, 0)
@@ -84,18 +84,22 @@ def solve(p, c, alpha, customers, distances, demands):
         for k in customers:
             model.addConstr(assignment[i, k] <= assignment[k, k])
 
+    for k in customers:
+        model.addConstr(quicksum(y[i, k, l] for i in customers for l in customers) <= assignment[k, k] * all_demand)
+        # big M constraint - makes sure that y[i, k, l] is only > 0 if l is a true hub
+        model.addConstr(quicksum(y[i, l, k] for i in customers for l in customers) <= assignment[k, k] * all_demand)
     # Constraint 4: Supply must flow through open hubs
-    for i in customers:
-        model.addConstr(y[i, i, i] == supply[i] * assignment[i, i])
-        for k in customers:
-            # big M constraint - makes sure that y[i, k, l] is only > 0 if k is a true hub
-            model.addConstr(quicksum(y[i, k, l] for l in customers) <= assignment[k, k] * all_demand)
-            # big M constraint - makes sure that y[i, k, l] is only > 0 if l is a true hub
-            model.addConstr(quicksum(y[i, l, k] for l in customers) <= assignment[k, k] * all_demand)
-            # a flow can only go through an open hub
-            for l in customers:
-                model.addConstr(y[i, k, l] <= assignment[k, k] * supply[i])
-                model.addConstr(y[i, k, l] <= assignment[l, l] * supply[i])
+    # for i in customers:
+    #     model.addConstr(y[i, i, i] == supply[i] * assignment[i, i])
+    #     for k in customers:
+    #         # big M constraint - makes sure that y[i, k, l] is only > 0 if k is a true hub
+    #         model.addConstr(quicksum(y[i, k, l] for l in customers) <= assignment[k, k] * all_demand)
+    #         # big M constraint - makes sure that y[i, k, l] is only > 0 if l is a true hub
+    #         model.addConstr(quicksum(y[i, l, k] for l in customers) <= assignment[k, k] * all_demand)
+    #         # a flow can only go through an open hub
+    #         for l in customers:
+    #             model.addConstr(y[i, k, l] <= assignment[k, k] * supply[i])
+    #             model.addConstr(y[i, k, l] <= assignment[l, l] * supply[i])
 
     # Constraint 4: flow conservation
     for k in customers:
@@ -183,7 +187,7 @@ def solve(p, c, alpha, customers, distances, demands):
 if __name__ == "__main__":
     import os
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    full_instance_path = dir_path+'/n60.json'
+    full_instance_path = dir_path+'/n40.json'
     # p, c, alpha, customers, distances, demands = read_instance("n10.json")
     p, c, alpha, customers, distances, demands = read_instance(
         full_instance_path)
