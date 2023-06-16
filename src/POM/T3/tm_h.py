@@ -69,7 +69,7 @@ def solve(full_instance_path, calendar_path):
         def parse_value(self, frame, attr):
             if isinstance(frame[attr], int):
                 if frame[attr] < 0:
-                    frame[attr] = 0 
+                    frame[attr] = frame[attr] * -1
                 self.body_need[attr] = frame[attr]
             else:
                 # if not any meaningfull data type, we just say it is 0
@@ -340,11 +340,11 @@ def solve(full_instance_path, calendar_path):
                     vtype=gp.GRB.BINARY, obj=1.0, name=f"x_{ex}_{day_c}")
         
         # training time of body part per day
-        # training_time = {}
-        # for day_c in days:
-        #     for body_part in body_parts_names:
-        #         training_time[f"{body_part}_{day_c}"] = model.addVar(
-        #             vtype=gp.GRB.CONTINUOUS, obj=0.0, name=f"t_{body_part}_{day_c}")
+        training_time = {}
+        for day_c in days:
+            for body_part in body_parts_names:
+                training_time[f"{body_part}_{day_c}"] = model.addVar(
+                    vtype=gp.GRB.CONTINUOUS, obj=0.0, name=f"t_{body_part}_{day_c}")
 
         # constr: only train if we have exercises selected
         for day_c in days:
@@ -360,15 +360,15 @@ def solve(full_instance_path, calendar_path):
                 x[f"{ex}_{day_c}"] for ex in warumups) == d[day_c], name=f"only_one_warmup_{day_c}")
 
         # constr: if we perform an exercise, we add the exercise time to the training time of the body part
-        # for day_c in days:
-        #     for body_part, exercises in info.allExerciseByBody.items():
-        #         model.addConstr(
-        #             gp.quicksum(
-        #                 x[f"{ex}_{day_c}"] * info.allExercise[ex].totalTime for ex in exercises)
-        #             ==
-        #             training_time[f"{body_part}_{day_c}"],
-        #             name=f"training_time_{body_part}_{day_c}"
-        #         )
+        for day_c in days:
+            for body_part, exercises in info.allExerciseByBody.items():
+                model.addConstr(
+                    gp.quicksum(
+                        x[f"{ex}_{day_c}"] * info.allExercise[ex].totalTime for ex in exercises)
+                    ==
+                    training_time[f"{body_part}_{day_c}"],
+                    name=f"training_time_{body_part}_{day_c}"
+                )
 
         # constr: consider the minimum and maximum training time for each workout
         for day_c in days:
@@ -396,14 +396,8 @@ def solve(full_instance_path, calendar_path):
             model.addConstr(gp.quicksum(
                 d[day] for day in days_of_week) <= info.maxWeek, name=f"max_week_{week}")
             for body_part, time in info.needs.body_need.items():
-                exercises = info.allExerciseByBody[body_part]
-                model.addConstr(
-                    gp.quicksum(
-                        x[f"{ex}_{day_c}"] * info.allExercise[ex].totalTime for ex in exercises for day_c in days_of_week)
-                    >= time,
-                    name=f"training_time_{body_part}_week_{week}"
-                )
-
+                model.addConstr(gp.quicksum(
+                    training_time[f"{body_part}_{day}"] for day in days_of_week) >= time, name=f"min_week_{week}_{body_part}")
 
         # general training rule
 
@@ -625,5 +619,5 @@ def output(x, possible_times, exercise_times, info):
 
 if __name__ == "__main__":
     model_solved = solve(
-        full_instance_path="ex1.xlsx", calendar_path="cal1.ics"
+        full_instance_path="ex2.xlsx", calendar_path="cal2.ics"
     )
