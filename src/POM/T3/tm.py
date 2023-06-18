@@ -67,10 +67,9 @@ def solve(full_instance_path, calendar_path):
         # minimum body training time needed for each muscle group
 
         def parse_value(self, frame, attr):
-            if isinstance(frame[attr], int):
-                if frame[attr] < 0:
-                    frame[attr] = 0 
-                self.body_need[attr] = frame[attr]
+            v = int(frame[attr])
+            if v >= 0:
+                self.body_need[attr] = v
             else:
                 # if not any meaningfull data type, we just say it is 0
                 self.body_need[attr] = 0
@@ -108,16 +107,16 @@ def solve(full_instance_path, calendar_path):
             self.needs = None
             self.sanity_check_needs(exercise_dataset)
 
-            # drop last row
-            exercise_dataset = exercise_dataset.drop(
-                exercise_dataset.index[-1])
+            # drop needs plan row
+            exercise_dataset = exercise_dataset[exercise_dataset["Name"] != "Minimum Weekly Workout Time"]
             self.sanity_check_exercise(exercise_dataset)
             self.sanity_check_exercise_by_body(exercise_dataset)
 
-        def sanity_check_needs(self, exercise_dataset):
-            last_row = exercise_dataset.iloc[-1]
+        def sanity_check_needs(self, df):
+            # last_row = exercise_dataset.iloc[-1]
             # assert last_row["Name"] == "Minimum Weekly Workout Time", "last row of exercise dataset is not minimum weekly workout time"
-            self.needs = NeedsPlan(last_row)
+            minimum_weekly = df.loc[df["Name"] == "Minimum Weekly Workout Time"]
+            self.needs = NeedsPlan(minimum_weekly)
 
         def sanity_check_exercise(self, exercise_dataset):
             for index, row in exercise_dataset.iterrows():
@@ -625,5 +624,5 @@ def output(x, possible_times, exercise_times, info):
 
 if __name__ == "__main__":
     model_solved = solve(
-        full_instance_path="ex1.xlsx", calendar_path="cal1.ics"
+        full_instance_path="ex2.xlsx", calendar_path="cal2.ics"
     )
